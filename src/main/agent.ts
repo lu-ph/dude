@@ -1,7 +1,7 @@
 import { query, type Query } from "@anthropic-ai/claude-agent-sdk"
 import dotenv from "dotenv"
 import { createScreenshotMcpServer } from "./tools/screen-capture.js"
-import { createPdfViewerMcpServer } from "./tools/open-pdf-viewer.js"
+import { createPdfViewerMcpServer } from "./tools/pdf-viewer-tool.js"
 
 dotenv.config()
 

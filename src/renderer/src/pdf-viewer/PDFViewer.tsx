@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { Document, Page, pdfjs } from "react-pdf"
-// import "react-pdf/dist/Page/AnnotationLayer.css";
-// import "react-pdf/dist/Page/TextLayer.css";
 import { PDFViewerIpcHandler } from "./ipc-handler"
 import { PDFBackendToClientMessage } from "../types/types"
 
@@ -13,6 +11,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 export const PDFViewer: React.FC = () => {
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const handleJumpToPage = (pageNum: number): void => {
     setCurrentPage(pageNum)
@@ -48,6 +47,7 @@ export const PDFViewer: React.FC = () => {
           })
           break
         case "pdf:buffer": {
+          setErrorMsg(null)
           const base64 = msg.payload.buffer
           try {
             const binaryString = atob(base64)
@@ -59,11 +59,13 @@ export const PDFViewer: React.FC = () => {
             setPdfData(bytes)
           } catch (err) {
             console.error("[PDFViewer] decode error:", err)
+            setErrorMsg("解析 PDF 数据失败")
           }
           break
         }
         case "pdf:error":
           console.error("[PDFViewer] Error:", msg.payload.error)
+          setErrorMsg(msg.payload.error)
           break
       }
     })
@@ -74,130 +76,86 @@ export const PDFViewer: React.FC = () => {
     }
   }, [numPages])
 
-  const file = React.useMemo(() => (pdfData ? { data: pdfData } : null), [pdfData])
+  const file = useMemo(() => (pdfData ? { data: pdfData } : null), [pdfData])
 
   return (
-    <div style={styles.container}>
-      <div style={styles.toolbar}>
-        <span style={styles.pageInfo}>
-          页码：<strong style={styles.pageHighlight}>{currentPage}</strong> / {numPages}
+    <div className="flex flex-col h-screen bg-[#1e1e1e] text-[#cccccc] font-sans">
+      <div className="sticky top-0 z-10 flex justify-between items-center px-5 py-2 bg-[#252526] border-b border-[#3c3c3c] shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+        <span className="text-[15px] text-[#cccccc] tracking-[0.5px]">
+          页码：<strong className="text-[18px] font-bold text-white px-0.5">{currentPage}</strong> /{" "}
+          {numPages}
         </span>
         <div>
           <button
             disabled={currentPage <= 1}
             onClick={() => handleJumpToPage(Math.max(currentPage - 1, 1))}
-            style={{
-              ...styles.button,
-              opacity: currentPage <= 1 ? 0.4 : 1,
-              cursor: currentPage <= 1 ? "not-allowed" : "pointer",
-            }}
+            className="bg-[#0e639c] text-white border-none rounded-sm px-[14px] py-[6px] text-[13px] font-medium transition-colors duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             上一页
           </button>
           <button
             disabled={currentPage >= numPages}
             onClick={() => handleJumpToPage(Math.min(currentPage + 1, numPages))}
-            style={{
-              ...styles.button,
-              marginLeft: 8,
-              opacity: currentPage >= numPages ? 0.4 : 1,
-              cursor: currentPage >= numPages ? "not-allowed" : "pointer",
-            }}
+            className="ml-2 bg-[#0e639c] text-white border-none rounded-sm px-[14px] py-[6px] text-[13px] font-medium transition-colors duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             下一页
           </button>
         </div>
       </div>
 
-      <div style={styles.pdfWrapper}>
-        {file && (
+      <div className="flex-1 overflow-y-auto flex justify-center py-3">
+        {errorMsg ? (
+          <div className="flex flex-col items-center justify-center mt-20 p-6 bg-[#252526] border border-[#3c3c3c] rounded-md shadow-lg max-w-md w-full h-fit">
+            <svg
+              className="w-12 h-12 text-[#f48771] mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span className="text-[#f48771] text-[16px] font-semibold">加载 PDF 失败</span>
+            <span className="text-[#cccccc] text-[14px] mt-2 text-center leading-relaxed">
+              {errorMsg}
+            </span>
+          </div>
+        ) : file ? (
           <Document file={file} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
             {Array.from(new Array(numPages), (_, index) => {
               const pageNum = index + 1
+              const isCurrent = pageNum === currentPage
+
               return (
                 <div
                   key={`page_${pageNum}`}
                   id={`pdf-page-${pageNum}`}
-                  style={{
-                    ...styles.pageContainer,
-                    border: pageNum === currentPage ? "2px solid #007acc" : "1px solid #2d2d2d",
-                    boxShadow:
-                      pageNum === currentPage
-                        ? "0 0 12px rgba(0, 122, 204, 0.4)"
-                        : "0 4px 10px rgba(0,0,0,0.3)",
-                  }}
+                  className={`mb-2 bg-white rounded-sm transition-all duration-200 ease-in-out box-border ${
+                    isCurrent
+                      ? "border-2 border-[#007acc] shadow-[0_0_12px_rgba(0,122,204,0.4)]"
+                      : "border border-[#2d2d2d] shadow-[0_4px_10px_rgba(0,0,0,0.3)]"
+                  }`}
                 >
                   <Page
                     pageNumber={pageNum}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
                     width={800}
                   />
                 </div>
               )
             })}
           </Document>
+        ) : (
+          <div className="mt-20 text-[#888888] text-[15px]">等待加载 PDF 文件...</div>
         )}
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: "flex",
-    flexDirection: "column",
-    height: "100vh",
-    backgroundColor: "#1e1e1e",
-    color: "#cccccc",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  toolbar: {
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "8px 20px",
-    backgroundColor: "#252526",
-    borderBottom: "1px solid #3c3c3c",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-  },
-  pageInfo: {
-    fontSize: "15px",
-    color: "#cccccc",
-    letterSpacing: "0.5px",
-  },
-  pageHighlight: {
-    fontSize: "18px",
-    fontWeight: "bold",
-    color: "#ffffff",
-    padding: "0 2px",
-  },
-  button: {
-    backgroundColor: "#0e639c",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "2px",
-    padding: "6px 14px",
-    fontSize: "13px",
-    fontWeight: 500,
-    transition: "background-color 0.2s",
-  },
-  pdfWrapper: {
-    flex: 1,
-    overflowY: "auto",
-    display: "flex",
-    justifyContent: "center",
-    padding: "12px 0",
-  },
-  pageContainer: {
-    marginBottom: 8,
-    backgroundColor: "#ffffff",
-    borderRadius: 2,
-    transition: "all 0.2s ease",
-  },
 }
 
 export default PDFViewer

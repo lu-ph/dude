@@ -6,6 +6,7 @@ import { setupWindowSession, sessions } from "./window-manager.js"
 import { PDFViewerSession } from "./bridge/pdf-viewer-session.js"
 
 let pdfViewerWindow: BrowserWindow | null = null
+let pdfSession: PDFViewerSession
 
 function loadRoute(window: BrowserWindow, hashRoute: string = "/"): void {
   const formattedHash = hashRoute.startsWith("/") ? `#${hashRoute}` : `#/${hashRoute}`
@@ -34,7 +35,7 @@ export function showPdfViewer(filePath: string): Promise<void> {
       pdfViewerWindow.restore()
     }
     pdfViewerWindow.focus()
-    const pdfSession = getPdfSession(pdfViewerWindow)
+    pdfSession = getPdfSession(pdfViewerWindow)
     if (!pdfSession) {
       return Promise.reject(new Error("PDFViewerSession not found"))
     }
@@ -73,7 +74,7 @@ export function showPdfViewer(filePath: string): Promise<void> {
     }
 
     const onLoad = (): void => {
-      const pdfSession = getPdfSession(pdfViewerWindow!)
+      pdfSession = getPdfSession(pdfViewerWindow!)
       if (!pdfSession) {
         cleanup()
         reject(new Error("PDFViewerSession not found"))
@@ -104,4 +105,42 @@ export function showPdfViewer(filePath: string): Promise<void> {
     pdfViewerWindow!.webContents.on("did-finish-load", onLoad)
     pdfViewerWindow!.webContents.on("did-fail-load", onFail)
   })
+}
+
+export async function captureScreenshot(): Promise<string> {
+  checkWindowAvailable()
+
+  await new Promise((resolve) => setTimeout(resolve, 800))
+
+  const image = await pdfViewerWindow!.webContents.capturePage()
+  return image.toPNG().toString("base64")
+}
+
+export async function jumpToPage(pageNum: number): Promise<string> {
+  checkWindowAvailable()
+
+  pdfSession.jumpToPage(pageNum)
+
+  await new Promise((resolve) => setTimeout(resolve, 800))
+
+  const image = await pdfViewerWindow.webContents.capturePage()
+  return image.toPNG().toString("base64")
+}
+
+export async function nextPage(): Promise<string> {
+  checkWindowAvailable()
+  pdfSession.nextPage()
+  return await captureScreenshot()
+}
+
+export async function previousPage(): Promise<string> {
+  checkWindowAvailable()
+  pdfSession.previousPage()
+  return await captureScreenshot()
+}
+
+function checkWindowAvailable(): void {
+  if (!pdfViewerWindow || pdfViewerWindow.isDestroyed()) {
+    throw new Error("PDF Viewer window is not available")
+  }
 }

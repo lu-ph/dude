@@ -11,6 +11,7 @@ function createWindow(): void {
     width: 900,
     height: 670,
     show: true,
+    alwaysOnTop: true,
     autoHideMenuBar: true,
     ...(process.platform === "linux" ? { icon } : {}),
     webPreferences: {
@@ -19,17 +20,6 @@ function createWindow(): void {
     },
   })
   loadRoute(mainWindow, "/")
-
-  // const presentationWindow = new BrowserWindow({
-  //   width: 1024,
-  //   height: 768,
-  //   show: false, // hide at first. waiting for agent to invoke
-  //   webPreferences: {
-  //     preload: join(__dirname, '../preload/index.js'),
-  //     sandbox: false,
-  //   },
-  // })
-  // loadRoute(presentationWindow, '/presentation-window')
 
   mainWindow.on("ready-to-show", () => {
     mainWindow.show()
