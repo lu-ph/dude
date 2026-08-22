@@ -1,16 +1,15 @@
-import { app, shell, BrowserWindow, ipcMain } from "electron"
+import { app, shell, BrowserWindow } from "electron"
 import { join } from "path"
 import { electronApp, optimizer, is } from "@electron-toolkit/utils"
 import icon from "../../resources/icon.png?asset"
-import { AgentSession } from "./bridge/agent-session.js"
-import { PDFViewerSession } from "./bridge/pdf-viewer-session.js"
-import { sessions, setupWindowSession } from "./window-manager.js"
+import { setupIpcRoutes } from "./ipc-router.js"
+import { setupWindowSession } from "./window/window-manager.js"
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
-    show: true,
+    show: false,
     alwaysOnTop: true,
     autoHideMenuBar: true,
     ...(process.platform === "linux" ? { icon } : {}),
@@ -19,8 +18,6 @@ function createWindow(): void {
       sandbox: false,
     },
   })
-  loadRoute(mainWindow, "/")
-
   mainWindow.on("ready-to-show", () => {
     mainWindow.show()
   })
@@ -39,18 +36,6 @@ function createWindow(): void {
   setupWindowSession(mainWindow)
 }
 
-function loadRoute(window: BrowserWindow, hashRoute: string = "/"): void {
-  const formattedHash = hashRoute.startsWith("/") ? `#${hashRoute}` : `#/${hashRoute}`
-
-  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    window.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}${formattedHash}`)
-  } else {
-    window.loadFile(join(__dirname, "../renderer/index.html"), {
-      hash: hashRoute,
-    })
-  }
-}
-
 app.whenReady().then(() => {
   electronApp.setAppUserModelId("com.electron")
 
@@ -58,36 +43,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.on("backend-message", (event, message) => {
-    handleBackendMessage(event, message)
-  })
-
-  ipcMain.on("agent:message", (event, message) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
-    if (!win) return
-    const winSessions = sessions.get(win.id)
-    if (!winSessions) return
-    const agentSession = winSessions.find((s) => s instanceof AgentSession) as
-      AgentSession | undefined
-    if (agentSession) {
-      agentSession.handleMessage(message)
-    }
-  })
-
-  ipcMain.on("pdfviewer:message", (event, message) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
-    if (!win) return
-    const winSessions = sessions.get(win.id)
-    if (!winSessions) return
-    const pdfSession = winSessions.find((s) => s instanceof PDFViewerSession) as
-      PDFViewerSession | undefined
-    if (pdfSession) {
-      pdfSession.handleMessage(message)
-    }
-  })
-
-  ipcMain.on("ping", () => console.log("pong"))
-
+  setupIpcRoutes()
   createWindow()
 
   app.on("activate", function () {
@@ -100,17 +56,3 @@ app.on("window-all-closed", () => {
     app.quit()
   }
 })
-
-function handleBackendMessage(event: Electron.IpcMainEvent, message: unknown): void {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (!win) return
-
-  const winSessions = sessions.get(win.id)
-  if (!winSessions) return
-
-  for (const session of winSessions) {
-    if (session.handleMessage(message)) {
-      break
-    }
-  }
-}

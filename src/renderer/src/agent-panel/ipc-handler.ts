@@ -1,12 +1,15 @@
-import { AgentBackendToClientMessage, AgentClientToBackendMessage } from "../types/types"
+import {
+  AgentBackendToClientMessage,
+  AgentClientToBackendMessage,
+} from "@renderer/types/agent-types"
 
 export class AgentIpcHandler {
   private onMessageCallback: ((msg: AgentBackendToClientMessage) => void) | null = null
   private cleanup: (() => void) | null = null
 
   constructor() {
-    if (window.api?.agentClientToBackendMessage) {
-      this.cleanup = window.api.agentClientToBackendMessage((msg: unknown) => {
+    if (window.api?.agent?.onMessageFromMain) {
+      this.cleanup = window.api.agent.onMessageFromMain((msg: unknown) => {
         if (this.onMessageCallback) {
           this.onMessageCallback(msg as AgentBackendToClientMessage)
         }
@@ -15,8 +18,8 @@ export class AgentIpcHandler {
   }
 
   send(msg: AgentClientToBackendMessage): void {
-    if (window.api?.agentBackendToClientMessage) {
-      window.api.agentBackendToClientMessage(msg as unknown as AgentBackendToClientMessage)
+    if (window.api?.agent?.sendToMain) {
+      window.api.agent.sendToMain(msg)
     }
   }
 

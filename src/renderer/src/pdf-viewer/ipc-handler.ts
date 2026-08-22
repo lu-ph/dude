@@ -1,12 +1,12 @@
-import { PDFBackendToClientMessage, PDFClientToBackendMessage } from "../types/types"
+import { PDFBackendToClientMessage, PDFClientToBackendMessage } from "@renderer/types/pdf-types"
 
 export class PDFViewerIpcHandler {
   private onMessageCallback: ((msg: PDFBackendToClientMessage) => void) | null = null
   private cleanup: (() => void) | null = null
 
   constructor() {
-    if (window.api?.pdfClientToBackendMessage) {
-      this.cleanup = window.api.pdfClientToBackendMessage((msg: unknown) => {
+    if (window.api?.pdf?.onMessageFromMain) {
+      this.cleanup = window.api.pdf.onMessageFromMain((msg: unknown) => {
         if (this.onMessageCallback) {
           this.onMessageCallback(msg as PDFBackendToClientMessage)
         }
@@ -15,8 +15,8 @@ export class PDFViewerIpcHandler {
   }
 
   send(msg: PDFClientToBackendMessage): void {
-    if (window.api?.pdfBackendToClientMessage) {
-      window.api.pdfBackendToClientMessage(msg as unknown as PDFBackendToClientMessage)
+    if (window.api?.pdf?.sendToMain) {
+      window.api.pdf.sendToMain(msg)
     }
   }
 

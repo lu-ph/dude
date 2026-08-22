@@ -8,7 +8,7 @@ import {
   nextPage,
   previousPage,
   showPdfViewer,
-} from "../pdf-viewer-window.js"
+} from "../window/pdf-viewer-window.js"
 
 export function createPdfViewerMcpServer(): any {
   return createSdkMcpServer({

@@ -1,8 +1,9 @@
-import { Agent } from "../agent.js"
+import { Agent } from "../service/agent.js"
 import { BaseSession } from "../types/interface/session.js"
+import { BackendToClientMessage, ClientToBackendMessage, isMessageType } from "../types/types.js"
 
 interface IpcClient {
-  send(message: unknown): void
+  send(message: BackendToClientMessage): void
 }
 
 export class AgentSession implements BaseSession {
@@ -10,29 +11,27 @@ export class AgentSession implements BaseSession {
   private agent: Agent
   private isListening: boolean = false
   private isDestroyed: boolean = false
-  private pendingContent: string = ""
+  // private pendingContent: string = ""
 
   constructor(client: IpcClient) {
     this.agent = new Agent()
     this.client = client
   }
 
-  public async handleMessage(message: unknown): Promise<boolean> {
+  public async handleMessage(message: ClientToBackendMessage): Promise<boolean> {
     if (this.isDestroyed) return false
 
-    const msg = message as {
-      type: string
-      payload?: { prompt?: string }
-      content?: string
-      text?: string
-    }
-
-    if (msg.type === "agent:chat_request") {
-      const content = msg.payload?.prompt || msg.content || msg.text
-      if (typeof content === "string" && content.trim()) {
-        this.sendToAgent(content)
+    if (isMessageType(message, "agent:chat_request")) {
+      const prompt = message.payload.prompt
+      if (typeof prompt === "string" && prompt.trim()) {
+        this.sendToAgent(prompt)
         return true
       }
+    }
+
+    if (isMessageType(message, "agent:chat_interrupt")) {
+      await this.agent.pause()
+      return true
     }
 
     return false
@@ -51,7 +50,7 @@ export class AgentSession implements BaseSession {
   private async listenToAgent(): Promise<void> {
     if (this.isListening) return
     this.isListening = true
-    this.pendingContent = ""
+    // this.pendingContent = ""
 
     try {
       for await (const message of this.agent.getOutputStream()) {
@@ -94,39 +93,46 @@ export class AgentSession implements BaseSession {
       const content = msg.message?.content
 
       if (typeof content === "string") {
-        this.pendingContent += content
+        this.sendToClient({
+          type: "agent:text_delta",
+          payload: { text: content },
+        })
       } else if (Array.isArray(content)) {
         for (const block of content) {
           if (block.type === "text") {
-            this.pendingContent += block.text || ""
+            const text = block.text || ""
+            if (text) {
+              this.sendToClient({
+                type: "agent:text_delta",
+                payload: { text },
+              })
+            }
           } else if (block.type === "tool_use") {
             this.sendToClient({
               type: "agent:tool_call",
               payload: { name: block.name || "", id: block.id || "", input: block.input || {} },
             })
+          } else if (block.type === "thinking") {
+            console.log(JSON.stringify(block))
           }
         }
       }
-    } else if (msg.type === "result") {
-      if (this.pendingContent.length > 0) {
-        this.sendToClient({
-          type: "agent:chat_response",
-          payload: { content: this.pendingContent },
-        })
-        this.pendingContent = ""
-      }
+    }
+
+    if (msg.type === "result") {
       this.sendToClient({
         type: "agent:final",
         payload: {
           success: msg.subtype === "success",
-          cost: msg.total_cost_usd || "",
-          duration: msg.duration_ms || "",
+          duration: msg.duration_ms ? `${msg.duration_ms}ms` : "unknown",
+          cost: msg.total_cost_usd ? `$${msg.total_cost_usd}` : "unknown",
         },
       })
+      return
     }
   }
 
-  private sendToClient(message: unknown): void {
+  private sendToClient(message: BackendToClientMessage): void {
     if (!this.client) {
       return
     }

@@ -1,7 +1,9 @@
 import { query, type Query } from "@anthropic-ai/claude-agent-sdk"
 import dotenv from "dotenv"
-import { createScreenshotMcpServer } from "./tools/screen-capture.js"
-import { createPdfViewerMcpServer } from "./tools/pdf-viewer-tool.js"
+import { createScreenshotMcpServer } from "../tools/screen-capture.js"
+import { createPdfViewerMcpServer } from "../tools/pdf-viewer-tool.js"
+import fs from "node:original-fs"
+import path from "node:path"
 
 dotenv.config()
 
@@ -48,7 +50,7 @@ class MessageQueue {
     }
   }
 
-  close() {
+  close(): void {
     this.closed = true
   }
 }
@@ -61,7 +63,7 @@ export class Agent {
 
   constructor() {
     try {
-      this.outputIterator = query({
+      this.currentQuery = query({
         prompt: this.inputQueue as any,
         options: {
           cwd: process.cwd(),
@@ -106,7 +108,9 @@ export class Agent {
             // "mcp__presentation-window__*",
           ],
         },
-      })[Symbol.asyncIterator]()
+      })
+
+      this.outputIterator = this.currentQuery[Symbol.asyncIterator]()
     } catch (error: any) {
       if (error instanceof Error) {
         throw new Error(`error while running agent: ${error.message}`)
@@ -116,12 +120,25 @@ export class Agent {
     }
   }
 
-  async *getOutputStream() {
+  async *getOutputStream(): AsyncGenerator<any, void, unknown> {
     if (!this.outputIterator) {
       throw new Error("Session not initialized")
     }
     while (true) {
       const { value, done } = await this.outputIterator.next()
+
+      if (value) {
+        let logText = ""
+
+        if (typeof value === "string") {
+          logText = value
+        } else {
+          const typeHeader = value.type ? ` (${value.type})` : ""
+          logText = `${typeHeader}: ${JSON.stringify(value, null, 2)}`
+        }
+
+        appendToLog(logText)
+      }
       if (done) break
       yield value
     }
@@ -145,4 +162,8 @@ export class Agent {
       throw new Error(`error while pausing agent: ${error.message ? error.message : String(error)}`)
     }
   }
+}
+
+function appendToLog(content: string): void {
+  fs.appendFileSync(path.join(process.cwd(), "agent_output.txt"), content + "\n", "utf-8")
 }

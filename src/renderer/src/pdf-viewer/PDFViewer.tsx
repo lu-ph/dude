@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react"
 import { Document, Page, pdfjs } from "react-pdf"
 import { PDFViewerIpcHandler } from "./ipc-handler"
-import { PDFBackendToClientMessage } from "../types/types"
+import { PDFBackendToClientMessage } from "@renderer/types/pdf-types"
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -12,17 +12,31 @@ export const PDFViewer: React.FC = () => {
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
+  
+  const handlerRef = useRef<PDFViewerIpcHandler | null>(null)
+  
+  const currentPageRef = useRef<number>(currentPage)
+  useEffect(() => {
+    currentPageRef.current = currentPage
+  }, [currentPage])
 
   const handleJumpToPage = (pageNum: number): void => {
     setCurrentPage(pageNum)
-    const pageElement = document.getElementById(`pdf-page-${pageNum}`)
-    if (pageElement) {
-      pageElement.scrollIntoView({ behavior: "smooth", block: "center" })
-    }
-  }
+    
+    requestAnimationFrame(() => {
+      const pageElement = document.getElementById(`pdf-page-${pageNum}`)
+      if (pageElement) {
+        pageElement.scrollIntoView({ behavior: "auto", block: "center" })
 
-  const handlerRef = useRef<PDFViewerIpcHandler | null>(null)
-  const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
+        requestAnimationFrame(() => {
+          if (handlerRef.current) {
+            handlerRef.current.send({ type: "pdf:page_ready", payload: { pageNum } })
+          }
+        })
+      }
+    })
+  }
 
   useEffect(() => {
     handlerRef.current = new PDFViewerIpcHandler()
@@ -32,20 +46,16 @@ export const PDFViewer: React.FC = () => {
         case "pdf:jump_to_page":
           handleJumpToPage(msg.payload.pageNum)
           break
-        case "pdf:next_page":
-          setCurrentPage((prev) => {
-            const next = Math.min(prev + 1, numPages)
-            handleJumpToPage(next)
-            return next
-          })
+        case "pdf:next_page": {
+          const next = Math.min(currentPageRef.current + 1, numPages)
+          handleJumpToPage(next)
           break
-        case "pdf:previous_page":
-          setCurrentPage((prev) => {
-            const prevPage = Math.max(prev - 1, 1)
-            handleJumpToPage(prevPage)
-            return prevPage
-          })
+        }
+        case "pdf:previous_page": {
+          const prevPage = Math.max(currentPageRef.current - 1, 1)
+          handleJumpToPage(prevPage)
           break
+        }
         case "pdf:buffer": {
           setErrorMsg(null)
           const base64 = msg.payload.buffer
@@ -145,6 +155,14 @@ export const PDFViewer: React.FC = () => {
                     renderTextLayer={false}
                     renderAnnotationLayer={false}
                     width={800}
+                    onRenderSuccess={() => {
+                      if (pageNum === 1 && handlerRef.current) {
+                        handlerRef.current.send({
+                          type: "pdf:page_ready",
+                          payload: { pageNum },
+                        })
+                      }
+                    }}
                   />
                 </div>
               )

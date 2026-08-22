@@ -1,55 +1,23 @@
 import React, { useState, useEffect, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import { AgentIpcHandler } from "./ipc-handler"
-import { AgentBackendToClientMessage } from "../types/types"
+import { AgentBackendToClientMessage } from "@renderer/types/agent-types"
+import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
+import { ChatMessage } from "./types"
+import { ToolMessageCard } from "./ToolMessageCard"
+import { getToolDisplayName } from "./tool-name-map"
 
-interface ChatMessage {
-  id: string
-  role: "user" | "agent" | "tool" | "system" | "error"
-  content: string
-  metadata?: Record<string, unknown>
-}
-
-type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error"
-
-const ToolMessageCard: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
-  const [expanded, setExpanded] = useState(false)
-
-  return (
-    <div className="flex flex-col w-full">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1 text-[13px] text-[#c586c0] hover:text-[#d197d1] transition-colors w-fit font-mono focus:outline-none"
-      >
-        <span className="font-semibold">{msg.content}</span>
-        <svg
-          className={`w-[14px] h-[14px] transition-transform duration-200 ${
-            expanded ? "rotate-180" : ""
-          }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {expanded && (
-        <pre className="mt-1 text-[12px] bg-[#1e1e1e] p-[10px] rounded-[6px] border border-[#3c3c3c] whitespace-pre-wrap break-all text-[#9cdcfe] font-mono">
-          {typeof msg.metadata === "object" ? JSON.stringify(msg.metadata, null, 2) : msg.metadata}
-        </pre>
-      )}
-    </div>
-  )
-}
-
-export const AgentPanel: React.FC = () => {
+export function AgentPanel(): React.JSX.Element {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState("")
-  const [status, setStatus] = useState<ConnectionStatus>("connecting")
   const [isWaitingPrompt, setIsWaitingPrompt] = useState(true)
 
   const handlerRef = useRef<AgentIpcHandler | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const streamingMessageIdRef = useRef<string | null>(null)
 
   const scrollToBottom = (): void => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -62,53 +30,84 @@ export const AgentPanel: React.FC = () => {
   useEffect(() => {
     handlerRef.current = new AgentIpcHandler()
 
-    requestAnimationFrame(() => {
-      setStatus("connected")
-    })
-
     const handleMessage = (msg: AgentBackendToClientMessage): void => {
       switch (msg.type) {
-        case "agent:chat_response":
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), role: "agent", content: msg.payload.content },
-          ])
+        case "agent:text_delta": {
+          const delta = msg.payload.text || ""
+          if (!delta) break
+
+          if (!streamingMessageIdRef.current) {
+            const newId = `stream-${Date.now()}`
+            streamingMessageIdRef.current = newId
+
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: newId,
+                role: "agent",
+                content: delta,
+              },
+            ])
+          } else {
+            const currentId = streamingMessageIdRef.current
+
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === currentId
+                  ? {
+                      ...m,
+                      content: m.content + delta,
+                    }
+                  : m,
+              ),
+            )
+          }
           break
+        }
+
         case "agent:tool_call":
+          streamingMessageIdRef.current = null
+
           setMessages((prev) => [
             ...prev,
             {
               id: Date.now().toString(),
               role: "tool",
-              content: `执行工具: ${msg.payload.name}`,
+              content: getToolDisplayName(msg.payload.name),
               metadata: msg.payload.input,
             },
           ])
           break
+
         case "agent:final":
+          streamingMessageIdRef.current = null
           setMessages((prev) => [
             ...prev,
             {
               id: Date.now().toString(),
               role: "system",
-              content: `[完成] 状态: ${msg.payload.success ? "成功" : "失败"} | 耗时: ${msg.payload.duration} | 消耗: ${msg.payload.cost}`,
+              content: `[完成] 状态: ${msg.payload.success ? "成功" : "失败 (或被中断)"} | 耗时: ${msg.payload.duration} | 消耗: ${msg.payload.cost}`,
             },
           ])
           setIsWaitingPrompt(true)
           break
+
         case "agent:error":
+          streamingMessageIdRef.current = null
           setMessages((prev) => [
             ...prev,
             { id: Date.now().toString(), role: "error", content: msg.payload.error },
           ])
-          setIsWaitingPrompt(false)
+          setIsWaitingPrompt(true)
           break
+
         case "agent:system":
           setMessages((prev) => [
             ...prev,
             { id: Date.now().toString(), role: "system", content: msg.payload.message },
           ])
           break
+
         case "agent:wait_for_prompt":
           setIsWaitingPrompt(true)
           break
@@ -125,13 +124,27 @@ export const AgentPanel: React.FC = () => {
 
   const handleSend = (): void => {
     const trimmed = inputValue.trim()
-    if (!trimmed || !handlerRef.current) return
+    if (!trimmed || !handlerRef.current || !isWaitingPrompt) return
 
     setMessages((prev) => [...prev, { id: Date.now().toString(), role: "user", content: trimmed }])
     setInputValue("")
     setIsWaitingPrompt(false)
 
     handlerRef.current.send({ type: "agent:chat_request", payload: { prompt: trimmed } })
+  }
+
+  const handleInterrupt = (): void => {
+    if (!handlerRef.current || isWaitingPrompt) return
+
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now().toString(), role: "system", content: "正在尝试中断当前操作..." },
+    ])
+
+    handlerRef.current.send({
+      type: "agent:chat_interrupt",
+      payload: { content: "User interrupted" },
+    })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -143,27 +156,6 @@ export const AgentPanel: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#1e1e1e] text-[#cccccc] font-sans">
-      <header className="flex h-10 items-center justify-between bg-[#252526] px-[16px] border-b border-[#3c3c3c] shadow-sm shrink-0">
-        <div className="text-[14px] font-medium text-[#e1e1e1]"></div>
-        <div className="flex items-center gap-[6px]">
-          <span
-            className={`w-[8px] h-[8px] rounded-full ${
-              status === "connected"
-                ? "bg-[#4ec9b0]"
-                : status === "connecting"
-                  ? "bg-[#cca700] animate-pulse"
-                  : "bg-[#f14c4c]"
-            }`}
-          />
-          <span className="text-[11px] text-[#858585]">
-            {status === "connected" && "已连接"}
-            {status === "connecting" && "连接中..."}
-            {status === "disconnected" && "已断开"}
-            {status === "error" && "连接错误"}
-          </span>
-        </div>
-      </header>
-
       <div className="flex-1 overflow-y-auto p-[16px] [::-webkit-scrollbar]:w-[8px] [::-webkit-scrollbar-track]:bg-[#1e1e1e] [::-webkit-scrollbar-thumb]:bg-[#424242] [::-webkit-scrollbar-thumb]:rounded-[4px]">
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-[10px]">
           {messages.map((msg) => (
@@ -194,8 +186,13 @@ export const AgentPanel: React.FC = () => {
               )}
 
               {msg.role === "agent" && (
-                <div className="w-full text-[14px] leading-relaxed break-words text-[#cccccc] [&>p]:mb-[8px] last:[&>p]:mb-0 [&>ul]:list-disc [&>ul]:ml-5 [&>ul]:mb-[8px] [&>ol]:list-decimal [&>ol]:ml-5 [&>ol]:mb-[8px] [&>pre]:bg-[#252526] [&>pre]:p-3 [&>pre]:rounded-md [&>pre]:mb-[8px] [&>code]:bg-[#252526] [&>code]:px-1 [&>code]:rounded [&>table]:w-full [&>table]:border-collapse [&>table]:mb-[8px] [&>table>thead>tr>th]:border [&>table>thead>tr>th]:border-[#3c3c3c] [&>table>thead>tr>th]:px-3 [&>table>thead>tr>th]:py-2 [&>table>thead>tr>th]:bg-[#252526] [&>table>thead>tr>th]:text-left [&>table>tbody>tr>td]:border [&>table>tbody>tr>td]:border-[#3c3c3c] [&>table>tbody>tr>td]:px-3 [&>table>tbody>tr>td]:py-2">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div className="w-full text-[14px] leading-relaxed break-words text-[#cccccc] [&>p]:mb-[8px] last:[&>p]:mb-0 [&>ul]:list-disc [&>ul]:ml-5 [&>ul]:mb-[8px] [&>ol]:list-decimal [&>ol]:ml-5 [&>ol]:mb-[8px] [&>pre]:bg-[#252526] [&>pre]:p-3 [&>pre]:rounded-md [&>pre]:mb-[8px] [&>code]:bg-[#252526] [&>code]:px-1 [&>code]:rounded [&>table]:w-full [&>table]:border-collapse [&>table]:mb-[8px] [&>table>thead>tr>th]:border [&>table>thead>tr>th]:border-[#3c3c3c] [&>table>thead>tr>th]:px-3 [&>table>thead>tr>th]:py-2 [&>table>thead>tr>th]:bg-[#252526] [&>table>thead>tr>th]:text-left [&>table>tbody>tr>td]:border [&>table>tbody>tr>td]:border-[#3c3c3c] [&>table>tbody>tr>td]:px-3 [&>table>tbody>tr>td]:py-2 [&>hr]:my-[24px] [&>hr]:border-[#3c3c3c] [&>hr]:border-t">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 </div>
               )}
             </div>
@@ -215,26 +212,40 @@ export const AgentPanel: React.FC = () => {
             }
             rows={2}
             className="w-full max-h-[150px] min-h-[56px] bg-transparent text-[#cccccc] text-[14px] px-[14px] py-[12px] resize-none outline-none overflow-y-auto [::-webkit-scrollbar]:w-[6px] [::-webkit-scrollbar-thumb]:bg-[#424242] [::-webkit-scrollbar-thumb]:rounded-[3px]"
-            disabled={status !== "connected" || !isWaitingPrompt}
+            disabled={!isWaitingPrompt}
           />
-          <button
-            onClick={handleSend}
-            disabled={status !== "connected" || !inputValue.trim() || !isWaitingPrompt}
-            className="p-[12px] text-[#0e639c] hover:text-[#1177bb] disabled:text-[#4d4d4d] transition-colors shrink-0 mb-[2px]"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="w-[20px] h-[20px]"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+
+          {isWaitingPrompt ? (
+            <button
+              onClick={handleSend}
+              disabled={!inputValue.trim()}
+              title="发送"
+              className="p-[12px] text-[#0e639c] hover:text-[#1177bb] disabled:text-[#4d4d4d] transition-colors shrink-0 mb-[2px]"
             >
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="w-[20px] h-[20px]"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          ) : (
+            <button
+              onClick={handleInterrupt}
+              title="中断"
+              className="p-[12px] text-[#f14c4c] hover:text-[#ff6b6b] transition-colors shrink-0 mb-[2px] animate-pulse hover:animate-none"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>

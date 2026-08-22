@@ -1,7 +1,7 @@
 import { BrowserWindow } from "electron"
-import { AgentSession } from "./bridge/agent-session.js"
-import { PDFViewerSession } from "./bridge/pdf-viewer-session.js"
-import type { BaseSession } from "./types/interface/session.js"
+import { AgentSession } from "../bridge/agent-session.js"
+import { PDFViewerSession } from "../bridge/pdf-viewer-session.js"
+import type { BaseSession } from "../types/interface/session.js"
 
 export const sessions = new Map<number, BaseSession[]>()
 
@@ -9,7 +9,7 @@ export function setupWindowSession(window: BrowserWindow): void {
   const agentSession = new AgentSession({
     send: (message) => {
       if (!window.isDestroyed()) {
-        window.webContents.send("agent:message", message)
+        window.webContents.send("agent:main-to-renderer", message)
       }
     },
   })
@@ -17,7 +17,7 @@ export function setupWindowSession(window: BrowserWindow): void {
   const pdfSession = new PDFViewerSession({
     send: (message) => {
       if (!window.isDestroyed()) {
-        window.webContents.send("pdfviewer:message", message)
+        window.webContents.send("pdf:main-to-renderer", message)
       }
     },
   })

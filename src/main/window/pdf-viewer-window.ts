@@ -2,8 +2,8 @@ import { BrowserWindow } from "electron"
 import { join } from "path"
 import { is } from "@electron-toolkit/utils"
 import icon from "../../resources/icon.png?asset"
-import { setupWindowSession, sessions } from "./window-manager.js"
-import { PDFViewerSession } from "./bridge/pdf-viewer-session.js"
+import { setupWindowSession, sessions } from "../window/window-manager.js"
+import { PDFViewerSession } from "../bridge/pdf-viewer-session.js"
 
 let pdfViewerWindow: BrowserWindow | null = null
 let pdfSession: PDFViewerSession
@@ -43,8 +43,8 @@ export function showPdfViewer(filePath: string): Promise<void> {
   }
 
   pdfViewerWindow = new BrowserWindow({
-    width: 1024,
-    height: 768,
+    width: 1000,
+    height: 1400,
     show: true,
     autoHideMenuBar: true,
     ...(process.platform === "linux" ? { icon } : {}),
@@ -110,7 +110,7 @@ export function showPdfViewer(filePath: string): Promise<void> {
 export async function captureScreenshot(): Promise<string> {
   checkWindowAvailable()
 
-  await new Promise((resolve) => setTimeout(resolve, 800))
+  await pdfSession.waitForPageReady(1)
 
   const image = await pdfViewerWindow!.webContents.capturePage()
   return image.toPNG().toString("base64")
@@ -119,9 +119,9 @@ export async function captureScreenshot(): Promise<string> {
 export async function jumpToPage(pageNum: number): Promise<string> {
   checkWindowAvailable()
 
+  const pageReady = pdfSession.waitForPageReady(pageNum)
   pdfSession.jumpToPage(pageNum)
-
-  await new Promise((resolve) => setTimeout(resolve, 800))
+  await pageReady
 
   const image = await pdfViewerWindow.webContents.capturePage()
   return image.toPNG().toString("base64")
@@ -129,14 +129,20 @@ export async function jumpToPage(pageNum: number): Promise<string> {
 
 export async function nextPage(): Promise<string> {
   checkWindowAvailable()
+  const pageReady = pdfSession.waitForPageReady()
   pdfSession.nextPage()
-  return await captureScreenshot()
+  await pageReady
+  const image = await pdfViewerWindow!.webContents.capturePage()
+  return image.toPNG().toString("base64")
 }
 
 export async function previousPage(): Promise<string> {
   checkWindowAvailable()
+  const pageReady = pdfSession.waitForPageReady()
   pdfSession.previousPage()
-  return await captureScreenshot()
+  await pageReady
+  const image = await pdfViewerWindow!.webContents.capturePage()
+  return image.toPNG().toString("base64")
 }
 
 function checkWindowAvailable(): void {
