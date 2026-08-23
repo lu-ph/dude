@@ -1,7 +1,7 @@
 import { BrowserWindow } from "electron"
 import { join } from "path"
 import { is } from "@electron-toolkit/utils"
-import icon from "../../resources/icon.png?asset"
+import icon from "../../../resources/icon.png?asset"
 import { setupWindowSession, sessions } from "../window/window-manager.js"
 import { PDFViewerSession } from "../bridge/pdf-viewer-session.js"
 

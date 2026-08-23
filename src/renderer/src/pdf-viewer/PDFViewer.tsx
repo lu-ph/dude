@@ -13,9 +13,9 @@ export const PDFViewer: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
-  
+
   const handlerRef = useRef<PDFViewerIpcHandler | null>(null)
-  
+
   const currentPageRef = useRef<number>(currentPage)
   useEffect(() => {
     currentPageRef.current = currentPage
@@ -23,7 +23,7 @@ export const PDFViewer: React.FC = () => {
 
   const handleJumpToPage = (pageNum: number): void => {
     setCurrentPage(pageNum)
-    
+
     requestAnimationFrame(() => {
       const pageElement = document.getElementById(`pdf-page-${pageNum}`)
       if (pageElement) {
@@ -92,7 +92,8 @@ export const PDFViewer: React.FC = () => {
     <div className="flex flex-col h-screen bg-[#1e1e1e] text-[#cccccc] font-sans">
       <div className="sticky top-0 z-10 flex justify-between items-center px-5 py-2 bg-[#252526] border-b border-[#3c3c3c] shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
         <span className="text-[15px] text-[#cccccc] tracking-[0.5px]">
-          页码：<strong className="text-[18px] font-bold text-white px-0.5">{currentPage}</strong> /{" "}
+          页码：
+          <strong className="text-[18px] font-bold text-white px-0.5">{currentPage}</strong> /{" "}
           {numPages}
         </span>
         <div>

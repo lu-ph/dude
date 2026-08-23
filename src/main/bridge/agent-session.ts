@@ -110,7 +110,11 @@ export class AgentSession implements BaseSession {
           } else if (block.type === "tool_use") {
             this.sendToClient({
               type: "agent:tool_call",
-              payload: { name: block.name || "", id: block.id || "", input: block.input || {} },
+              payload: {
+                name: block.name || "",
+                id: block.id || "",
+                input: block.input || {},
+              },
             })
           } else if (block.type === "thinking") {
             console.log(JSON.stringify(block))

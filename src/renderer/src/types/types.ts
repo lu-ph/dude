@@ -22,6 +22,7 @@ export interface CustomAPI {
     onEvent: (callback: (message: unknown) => void) => () => void
   }
   agent: {
+    getPathForFile: (file: File) => string
     sendToMain: (msg: AgentClientToBackendMessage) => void
     onMessageFromMain: (callback: (msg: AgentBackendToClientMessage) => void) => () => void
   }

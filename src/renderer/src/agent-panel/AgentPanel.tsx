@@ -10,9 +10,15 @@ import { ChatMessage } from "./types"
 import { ToolMessageCard } from "./ToolMessageCard"
 import { getToolDisplayName } from "./tool-name-map"
 
+interface AttachedFile {
+  name: string
+  path: string
+}
+
 export function AgentPanel(): React.JSX.Element {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState("")
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [isWaitingPrompt, setIsWaitingPrompt] = useState(true)
 
   const handlerRef = useRef<AgentIpcHandler | null>(null)
@@ -124,13 +130,39 @@ export function AgentPanel(): React.JSX.Element {
 
   const handleSend = (): void => {
     const trimmed = inputValue.trim()
-    if (!trimmed || !handlerRef.current || !isWaitingPrompt) return
+    if ((!trimmed && attachedFiles.length === 0) || !handlerRef.current || !isWaitingPrompt) return
+
+    const fileMessage =
+      attachedFiles.length > 0
+        ? `\n\n<system_message>\nUser referenced the following file${attachedFiles.length > 1 ? "s" : ""}: ${attachedFiles.map((file) => file.path).join(", ")}\n</system_message>`
+        : ""
+    const prompt = `${trimmed}${fileMessage}`
 
     setMessages((prev) => [...prev, { id: Date.now().toString(), role: "user", content: trimmed }])
     setInputValue("")
+    setAttachedFiles([])
     setIsWaitingPrompt(false)
 
-    handlerRef.current.send({ type: "agent:chat_request", payload: { prompt: trimmed } })
+    handlerRef.current.send({ type: "agent:chat_request", payload: { prompt } })
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.preventDefault()
+    if (!isWaitingPrompt) return
+
+    const files = Array.from(e.dataTransfer.files)
+      .map((file) => {
+        const path = window.api.agent.getPathForFile(file)
+        return path && file.name ? { name: file.name, path } : null
+      })
+      .filter((file): file is AttachedFile => file !== null)
+
+    if (files.length > 0) {
+      setAttachedFiles((prev) => {
+        const existingPaths = new Set(prev.map((file) => file.path))
+        return [...prev, ...files.filter((file) => !existingPaths.has(file.path))]
+      })
+    }
   }
 
   const handleInterrupt = (): void => {
@@ -155,7 +187,11 @@ export function AgentPanel(): React.JSX.Element {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#1e1e1e] text-[#cccccc] font-sans">
+    <div
+      className="flex flex-col h-screen w-full bg-[#1e1e1e] text-[#cccccc] font-sans [scrollbar-color:#424242_#1e1e1e] [scrollbar-width:thin] [&_*]:[scrollbar-color:#424242_#1e1e1e] [&_*]:[scrollbar-width:thin] [&_*::-webkit-scrollbar]:w-[8px] [&_*::-webkit-scrollbar]:h-[8px] [&_*::-webkit-scrollbar-track]:bg-[#1e1e1e] [&_*::-webkit-scrollbar-thumb]:bg-[#424242] [&_*::-webkit-scrollbar-thumb]:rounded-[4px] [&_*::-webkit-scrollbar-thumb:hover]:bg-[#5a5a5a]"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleDrop}
+    >
       <div className="flex-1 overflow-y-auto p-[16px] [::-webkit-scrollbar]:w-[8px] [::-webkit-scrollbar-track]:bg-[#1e1e1e] [::-webkit-scrollbar-thumb]:bg-[#424242] [::-webkit-scrollbar-thumb]:rounded-[4px]">
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-[10px]">
           {messages.map((msg) => (
@@ -166,13 +202,13 @@ export function AgentPanel(): React.JSX.Element {
               }`}
             >
               {msg.role === "system" && (
-                <div className="text-[12px] text-[#858585] bg-[#2d2d2d] px-[8px] py-[4px] rounded-[4px] self-center my-[4px]">
+                <div className="text-[13px] text-[#858585] bg-[#2d2d2d] px-[8px] py-[4px] rounded-[4px] self-center my-[4px]">
                   {msg.content}
                 </div>
               )}
 
               {msg.role === "error" && (
-                <div className="text-[13px] text-[#f14c4c] bg-[#3a1d1d] px-[12px] py-[8px] rounded-[6px] border border-[#f14c4c]/30 mt-1">
+                <div className="text-[14px] text-[#f14c4c] bg-[#3a1d1d] px-[12px] py-[8px] rounded-[6px] border border-[#f14c4c]/30 mt-1">
                   {msg.content}
                 </div>
               )}
@@ -180,13 +216,13 @@ export function AgentPanel(): React.JSX.Element {
               {msg.role === "tool" && <ToolMessageCard msg={msg} />}
 
               {msg.role === "user" && (
-                <div className="bg-[#2d2d2d] text-[#e1e1e1] px-[14px] py-[10px] rounded-[12px] rounded-br-[4px] max-w-[85%] text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+                <div className="bg-[#2d2d2d] text-[#e1e1e1] px-[14px] py-[10px] rounded-[12px] rounded-br-[4px] max-w-[85%] text-[15px] leading-relaxed whitespace-pre-wrap break-words">
                   {msg.content}
                 </div>
               )}
 
               {msg.role === "agent" && (
-                <div className="w-full text-[14px] leading-relaxed break-words text-[#cccccc] [&>p]:mb-[8px] last:[&>p]:mb-0 [&>ul]:list-disc [&>ul]:ml-5 [&>ul]:mb-[8px] [&>ol]:list-decimal [&>ol]:ml-5 [&>ol]:mb-[8px] [&>pre]:bg-[#252526] [&>pre]:p-3 [&>pre]:rounded-md [&>pre]:mb-[8px] [&>code]:bg-[#252526] [&>code]:px-1 [&>code]:rounded [&>table]:w-full [&>table]:border-collapse [&>table]:mb-[8px] [&>table>thead>tr>th]:border [&>table>thead>tr>th]:border-[#3c3c3c] [&>table>thead>tr>th]:px-3 [&>table>thead>tr>th]:py-2 [&>table>thead>tr>th]:bg-[#252526] [&>table>thead>tr>th]:text-left [&>table>tbody>tr>td]:border [&>table>tbody>tr>td]:border-[#3c3c3c] [&>table>tbody>tr>td]:px-3 [&>table>tbody>tr>td]:py-2 [&>hr]:my-[24px] [&>hr]:border-[#3c3c3c] [&>hr]:border-t">
+                <div className="w-full text-[15px] leading-relaxed break-words text-[#cccccc] [&>p]:mb-[12px] [&>p]:leading-[1.8] [&>p:last-child]:mb-0 [&>ul]:list-disc [&>ul]:ml-5 [&>ul]:mb-[12px] [&>ol]:list-decimal [&>ol]:ml-5 [&>ol]:mb-[12px] [&>pre]:bg-[#252526] [&>pre]:p-3 [&>pre]:rounded-md [&>pre]:mb-[12px] [&>code]:bg-[#252526] [&>code]:px-1 [&>code]:rounded [&>table]:w-full [&>table]:border-collapse [&>table]:mb-[12px] [&>table>thead>tr>th]:border [&>table>thead>tr>th]:border-[#3c3c3c] [&>table>thead>tr>th]:px-3 [&>table>thead>tr>th]:py-2 [&>table>thead>tr>th]:bg-[#252526] [&>table>thead>tr>th]:text-left [&>table>tbody>tr>td]:border [&>table>tbody>tr>td]:border-[#3c3c3c] [&>table>tbody>tr>td]:px-3 [&>table>tbody>tr>td]:py-2 [&>hr]:my-[24px] [&>hr]:border-[#3c3c3c] [&>hr]:border-t">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}
@@ -197,28 +233,57 @@ export function AgentPanel(): React.JSX.Element {
               )}
             </div>
           ))}
+          {!isWaitingPrompt && (
+            <div className="flex items-center self-start px-[4px] py-[4px]">
+              <div className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-[#4d4d4d] border-t-[#3794ff]" />
+            </div>
+          )}
           <div ref={messagesEndRef} className="h-[10px]" />
         </div>
       </div>
 
       <div className="shrink-0 bg-transparent p-[16px] pb-[24px]">
-        <div className="max-w-3xl mx-auto relative flex items-end bg-[#252526] border border-[#3c3c3c] rounded-[12px] shadow-lg transition-colors">
+        <div className="max-w-3xl mx-auto flex flex-col bg-[#252526] border border-[#3c3c3c] rounded-[12px] shadow-lg transition-colors overflow-hidden">
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-[6px] px-[12px] pt-[10px]">
+              {attachedFiles.map((file) => (
+                <div
+                  key={file.path}
+                  title={file.name}
+                  className="flex items-center gap-[6px] max-w-full bg-[#333333] border border-[#4a4a4a] rounded-[7px] px-[8px] py-[5px] text-[13px] text-[#d4d4d4]"
+                >
+                  <span className="truncate max-w-[240px]">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedFiles((prev) => prev.filter((item) => item.path !== file.path))}
+                    title={`Remove ${file.name}`}
+                    aria-label={`Remove ${file.name}`}
+                    className="shrink-0 text-[#858585] hover:text-[#f14c4c] transition-colors"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="relative flex items-end">
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              isWaitingPrompt ? "输入指令 (Enter 发送, Shift+Enter 换行)..." : "Agent 正在处理中..."
+              isWaitingPrompt ? "(Enter 发送, Shift+Enter 换行)..." : "Agent 正在处理中..."
             }
             rows={2}
-            className="w-full max-h-[150px] min-h-[56px] bg-transparent text-[#cccccc] text-[14px] px-[14px] py-[12px] resize-none outline-none overflow-y-auto [::-webkit-scrollbar]:w-[6px] [::-webkit-scrollbar-thumb]:bg-[#424242] [::-webkit-scrollbar-thumb]:rounded-[3px]"
+            className="w-full max-h-[150px] min-h-[56px] bg-transparent text-[#cccccc] text-[15px] px-[14px] py-[12px] resize-none outline-none overflow-y-auto [::-webkit-scrollbar]:w-[6px] [::-webkit-scrollbar-thumb]:bg-[#424242] [::-webkit-scrollbar-thumb]:rounded-[3px]"
             disabled={!isWaitingPrompt}
           />
 
           {isWaitingPrompt ? (
             <button
               onClick={handleSend}
-              disabled={!inputValue.trim()}
+              disabled={!inputValue.trim() && attachedFiles.length === 0}
               title="发送"
               className="p-[12px] text-[#0e639c] hover:text-[#1177bb] disabled:text-[#4d4d4d] transition-colors shrink-0 mb-[2px]"
             >
@@ -239,13 +304,14 @@ export function AgentPanel(): React.JSX.Element {
             <button
               onClick={handleInterrupt}
               title="中断"
-              className="p-[12px] text-[#f14c4c] hover:text-[#ff6b6b] transition-colors shrink-0 mb-[2px] animate-pulse hover:animate-none"
+              className="p-[12px] text-[#707070] hover:text-[#cfcfcf] transition-colors shrink-0 mb-[2px] animate-pulse hover:animate-none"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>

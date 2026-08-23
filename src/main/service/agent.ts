@@ -63,54 +63,7 @@ export class Agent {
 
   constructor() {
     try {
-      this.currentQuery = query({
-        prompt: this.inputQueue as any,
-        options: {
-          cwd: process.cwd(),
-          model: process.env.ANTHROPIC_MODEL,
-          resume: this.sessionId,
-          settingSources: ["project"],
-          skills: "all",
-          env: {
-            /**
-             * OpenRouter via Claude Code custom endpoint:
-             * - ANTHROPIC_AUTH_TOKEN = API key
-             * - ANTHROPIC_API_KEY = '' (must be empty to avoid official OAuth)
-             * - ANTHROPIC_BASE_URL = 'https://openrouter.ai/api'
-             */
-            ...process.env,
-            ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
-            ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
-            ANTHROPIC_API_KEY: "",
-            ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
-          },
-          mcpServers: {
-            playwright: {
-              command: "npx",
-              args: ["@playwright/mcp@latest"],
-            },
-            screenshot: createScreenshotMcpServer(),
-            // notePanel: createNotePanelMcpServer(),
-            pdfViewer: createPdfViewerMcpServer(),
-            // presentationWindow: createPresentationWindowMcpServer(),
-          },
-          permissionMode: "bypassPermissions",
-          allowedTools: [
-            "Read",
-            "Edit",
-            "Write",
-            "Bash",
-            "Glob",
-            "mcp__playwright__*",
-            "mcp__screenshot__*",
-            // "mcp__note-panel__*",
-            "mcp__pdf-viewer__*",
-            // "mcp__presentation-window__*",
-          ],
-        },
-      })
-
-      this.outputIterator = this.currentQuery[Symbol.asyncIterator]()
+      this.init()
     } catch (error: any) {
       if (error instanceof Error) {
         throw new Error(`error while running agent: ${error.message}`)
@@ -118,6 +71,58 @@ export class Agent {
         throw new Error(`unknown error while running agent: ${String(error)}`)
       }
     }
+  }
+
+  init(): void {
+    this.currentQuery = query({
+      prompt: this.inputQueue as any,
+      options: {
+        cwd: process.cwd(),
+        model: process.env.ANTHROPIC_MODEL,
+        resume: this.sessionId,
+        settingSources: ["project"],
+        skills: "all",
+        includePartialMessages: false,
+        env: {
+          /**
+           * OpenRouter via Claude Code custom endpoint:
+           * - ANTHROPIC_AUTH_TOKEN = API key
+           * - ANTHROPIC_API_KEY = '' (must be empty to avoid official OAuth)
+           * - ANTHROPIC_BASE_URL = 'https://openrouter.ai/api'
+           */
+          ...process.env,
+          ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
+          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+          ANTHROPIC_API_KEY: "",
+          ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+        },
+        mcpServers: {
+          playwright: {
+            command: "npx",
+            args: ["@playwright/mcp@latest"],
+          },
+          screenshot: createScreenshotMcpServer(),
+          // notePanel: createNotePanelMcpServer(),
+          pdfViewer: createPdfViewerMcpServer(),
+          // presentationWindow: createPresentationWindowMcpServer(),
+        },
+        permissionMode: "bypassPermissions",
+        allowedTools: [
+          "Read",
+          "Edit",
+          "Write",
+          "Bash",
+          "Glob",
+          "mcp__playwright__*",
+          "mcp__screenshot__*",
+          // "mcp__note-panel__*",
+          "mcp__pdf-viewer__*",
+          // "mcp__presentation-window__*",
+        ],
+      },
+    })
+
+    this.outputIterator = this.currentQuery[Symbol.asyncIterator]()
   }
 
   async *getOutputStream(): AsyncGenerator<any, void, unknown> {

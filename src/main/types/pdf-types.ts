@@ -3,8 +3,6 @@ export interface PDFJumpPageMessage {
   payload: { pageNum: number }
 }
 
-
-
 export interface PDFNextPageMessage {
   type: "pdf:next_page"
   payload: Record<string, never>

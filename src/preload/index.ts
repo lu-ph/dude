@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron"
+import { contextBridge, ipcRenderer, webUtils } from "electron"
 import { electronAPI } from "@electron-toolkit/preload"
 import { AgentBackendToClientMessage, AgentClientToBackendMessage } from "../main/types/agent-types"
 import { PDFBackendToClientMessage, PDFClientToBackendMessage } from "../main/types/pdf-types"
@@ -16,6 +16,7 @@ const api = {
   },
 
   agent: {
+    getPathForFile: (file: File): string => webUtils.getPathForFile(file),
     sendToMain: (msg: AgentClientToBackendMessage): void => {
       ipcRenderer.send("agent:renderer-to-main", msg)
     },

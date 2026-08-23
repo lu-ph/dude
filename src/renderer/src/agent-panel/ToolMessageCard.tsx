@@ -1,14 +1,24 @@
 import { JSX, useState } from "react"
 import { ChatMessage } from "./types"
 
+function formatToolMetadata(metadata: Record<string, unknown> | undefined): string | undefined {
+  if (!metadata) return undefined
+
+  const serialized = JSON.stringify(metadata, null, 2)
+  return serialized.startsWith("{") && serialized.endsWith("}")
+    ? serialized.slice(1, -1).trim()
+    : serialized
+}
+
 export function ToolMessageCard({ msg }: { msg: ChatMessage }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
+  const formattedMetadata = formatToolMetadata(msg.metadata)
 
   return (
     <div className="flex flex-col w-full">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1 text-[13px] text-[#c586c0] hover:text-[#d197d1] transition-colors w-fit font-mono focus:outline-none"
+        className="flex items-center gap-1 text-[14px] text-[#6b6a6a] hover:text-[#999999] transition-colors w-fit font-sans focus:outline-none"
       >
         <span className="font-semibold">{msg.content}</span>
         <svg
@@ -23,8 +33,8 @@ export function ToolMessageCard({ msg }: { msg: ChatMessage }): JSX.Element {
         </svg>
       </button>
       {expanded && (
-        <pre className="mt-1 text-[12px] bg-[#1e1e1e] p-[10px] rounded-[6px] border border-[#3c3c3c] whitespace-pre-wrap break-all text-[#9cdcfe] font-mono">
-          {typeof msg.metadata === "object" ? JSON.stringify(msg.metadata, null, 2) : msg.metadata}
+        <pre className="mt-1 text-[13px] bg-[#1e1e1e] p-[10px] rounded-[6px] border border-[#3c3c3c] whitespace-pre-wrap break-all text-[#b8b8b8] font-sans leading-relaxed">
+          {formattedMetadata}
         </pre>
       )}
     </div>

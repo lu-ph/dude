@@ -15,6 +15,7 @@ declare global {
         onEvent(callback: (message: unknown) => void): () => void
       }
       agentBackendToClientMessage: (msg: AgentBackendToClientMessage) => void
+      getPathForFile: (file: File) => string
       agentClientToBackendMessage: (
         callback: (msg: AgentClientToBackendMessage) => void,
       ) => () => void
