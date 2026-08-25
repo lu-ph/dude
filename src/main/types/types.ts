@@ -20,6 +20,7 @@ export interface CustomAPI {
   common: {
     send: (message: unknown) => void
     onEvent: (callback: (message: unknown) => void) => () => void
+    openSettings: () => void
   }
   agent: {
     sendToMain: (msg: AgentClientToBackendMessage) => void

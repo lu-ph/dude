@@ -4,6 +4,7 @@ import { createScreenshotMcpServer } from "../tools/screen-capture.js"
 import { createPdfViewerMcpServer } from "../tools/pdf-viewer-tool.js"
 import fs from "node:original-fs"
 import path from "node:path"
+import { AIConfig, loadLLMEnv } from "../utils/env-utils.js"
 
 dotenv.config()
 
@@ -12,7 +13,6 @@ interface UserMessage {
   message: { role: "user"; content: string }
 }
 
-// Simple async queue - messages go in via push(), come out via async iteration
 class MessageQueue {
   private messages: UserMessage[] = []
   private waiting: ((msg: UserMessage) => void) | null = null
@@ -28,11 +28,9 @@ class MessageQueue {
     }
 
     if (this.waiting) {
-      // Someone is waiting for a message - give it to them
       this.waiting(msg)
       this.waiting = null
     } else {
-      // No one waiting - queue it
       this.messages.push(msg)
     }
   }
@@ -42,7 +40,6 @@ class MessageQueue {
       if (this.messages.length > 0) {
         yield this.messages.shift()!
       } else {
-        // Wait for next message
         yield await new Promise<UserMessage>((resolve) => {
           this.waiting = resolve
         })
@@ -65,15 +62,13 @@ export class Agent {
     try {
       this.init()
     } catch (error: any) {
-      if (error instanceof Error) {
-        throw new Error(`error while running agent: ${error.message}`)
-      } else {
-        throw new Error(`unknown error while running agent: ${String(error)}`)
-      }
+      throw Error(`error initing agent ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
   init(): void {
+    const llmConfig: AIConfig = loadLLMEnv()
+
     this.currentQuery = query({
       prompt: this.inputQueue as any,
       options: {
@@ -83,18 +78,19 @@ export class Agent {
         settingSources: ["project"],
         skills: "all",
         includePartialMessages: false,
+
+        /**
+         * OpenRouter via Claude Code custom endpoint:
+         * - ANTHROPIC_AUTH_TOKEN = API key
+         * - ANTHROPIC_API_KEY = '' (must be empty to avoid official OAuth)
+         * - ANTHROPIC_BASE_URL = 'https://openrouter.ai/api'
+         */
         env: {
-          /**
-           * OpenRouter via Claude Code custom endpoint:
-           * - ANTHROPIC_AUTH_TOKEN = API key
-           * - ANTHROPIC_API_KEY = '' (must be empty to avoid official OAuth)
-           * - ANTHROPIC_BASE_URL = 'https://openrouter.ai/api'
-           */
           ...process.env,
-          ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
-          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+          ANTHROPIC_AUTH_TOKEN: llmConfig.apiKey,
+          ANTHROPIC_BASE_URL: llmConfig.baseUrl,
           ANTHROPIC_API_KEY: "",
-          ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+          ANTHROPIC_MODEL: llmConfig.modelName,
         },
         mcpServers: {
           playwright: {
@@ -133,6 +129,9 @@ export class Agent {
       const { value, done } = await this.outputIterator.next()
 
       if (value) {
+        if (value.session_id) {
+          this.sessionId = value.session_id
+        }
         let logText = ""
 
         if (typeof value === "string") {
@@ -147,6 +146,17 @@ export class Agent {
       if (done) break
       yield value
     }
+  }
+
+  public async reloadConfig(): Promise<void> {
+    if (this.currentQuery) {
+      await this.pause().catch(() => {})
+    }
+
+    this.inputQueue.close()
+    this.inputQueue = new MessageQueue()
+
+    this.init()
   }
 
   public async sendMessage(userInput: string): Promise<void> {

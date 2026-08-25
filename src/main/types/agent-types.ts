@@ -1,3 +1,5 @@
+import type { AIConfig } from "../utils/env-utils.js"
+
 export interface AgentChatRequestMessage {
   type: "agent:chat_request"
   payload: { prompt: string }
@@ -6,6 +8,36 @@ export interface AgentChatRequestMessage {
 export interface AgentChatInterruptMessage {
   type: "agent:chat_interrupt"
   payload: { content: string }
+}
+
+export interface AgentLoadEnvFromJsonMessage {
+  type: "agent:load_env_from_json"
+  payload: Record<string, never>
+}
+
+export interface AgentCheckEnvMessage {
+  type: "agent:check_env"
+  payload: Record<string, never>
+}
+
+export interface AgentSetLLMEnvJsonMessage {
+  type: "agent:set_llm_env_json"
+  payload: { config: AIConfig }
+}
+
+export interface AgentEnvConfigMessage {
+  type: "agent:env_config"
+  payload: { config: AIConfig }
+}
+
+export interface AgentEnvCheckResultMessage {
+  type: "agent:env_check_result"
+  payload: { valid: boolean }
+}
+
+export interface AgentEnvUpdatedMessage {
+  type: "agent:env_updated"
+  payload: { success: boolean; error?: string }
 }
 
 // export interface AgentChatResponseMessage {
@@ -48,7 +80,12 @@ export interface AgentPromptMessage {
   payload: { prompt: string }
 }
 
-export type AgentClientToBackendMessage = AgentChatRequestMessage | AgentChatInterruptMessage
+export type AgentClientToBackendMessage =
+  | AgentChatRequestMessage
+  | AgentChatInterruptMessage
+  | AgentLoadEnvFromJsonMessage
+  | AgentCheckEnvMessage
+  | AgentSetLLMEnvJsonMessage
 
 export type AgentBackendToClientMessage =
   | AgentToolCallMessage
@@ -58,3 +95,6 @@ export type AgentBackendToClientMessage =
   | AgentWaitPromptMessage
   | AgentPromptMessage
   | AgentChatTextDeltaMessage
+  | AgentEnvConfigMessage
+  | AgentEnvCheckResultMessage
+  | AgentEnvUpdatedMessage

@@ -5,14 +5,20 @@ import type { BaseSession } from "../types/interface/session.js"
 
 export const sessions = new Map<number, BaseSession[]>()
 
-export function setupWindowSession(window: BrowserWindow): void {
-  const agentSession = new AgentSession({
-    send: (message) => {
-      if (!window.isDestroyed()) {
-        window.webContents.send("agent:main-to-renderer", message)
-      }
+export function setupWindowSession(
+  window: BrowserWindow,
+  options: { createAgent?: boolean } = {},
+): void {
+  const agentSession = new AgentSession(
+    {
+      send: (message) => {
+        if (!window.isDestroyed()) {
+          window.webContents.send("agent:main-to-renderer", message)
+        }
+      },
     },
-  })
+    options.createAgent ?? true,
+  )
 
   const pdfSession = new PDFViewerSession({
     send: (message) => {

@@ -10,6 +10,11 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
+      common: {
+        send(message: unknown): void
+        onEvent(callback: (message: unknown) => void): () => void
+        openSettings(): void
+      }
       backend: {
         send(message: unknown): void
         onEvent(callback: (message: unknown) => void): () => void

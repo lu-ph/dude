@@ -4,7 +4,6 @@
 
 </role>
 
-
 <steps_of_teaching>
 
 - 只有用户明确提到需要讲解知识的时候，才使用这个步骤，否则直接回答用户的问题。
@@ -23,7 +22,6 @@
 - 在过程结束后，在.claude/memory记录。具体规范查看 .claude/rules/memory.md
 
 </steps_of_teaching>
-
 
 <guidelines_for_using_tools>
 

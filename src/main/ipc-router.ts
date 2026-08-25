@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow } from "electron"
 import { sessions } from "./window/window-manager.js"
 import { AgentSession } from "./bridge/agent-session.js"
 import { PDFViewerSession } from "./bridge/pdf-viewer-session.js"
+import { showSettingsWindow } from "./window/settings-window.js"
 
 export function setupIpcRoutes(): void {
   ipcMain.on("common:renderer-to-main", (event, message) => {
@@ -33,6 +34,10 @@ export function setupIpcRoutes(): void {
   })
 
   ipcMain.on("ping", () => console.log("pong"))
+  ipcMain.on("settings:open", (event) => {
+    const parentWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
+    showSettingsWindow(parentWindow)
+  })
 }
 
 function handleCommonMessage(event: Electron.IpcMainEvent, message: unknown): void {

@@ -13,6 +13,9 @@ const api = {
       ipcRenderer.on("common:main-to-renderer", listener)
       return () => ipcRenderer.removeListener("common:main-to-renderer", listener)
     },
+    openSettings(): void {
+      ipcRenderer.send("settings:open")
+    },
   },
 
   agent: {
