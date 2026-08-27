@@ -1,5 +1,5 @@
-import { AgentBackendToClientMessage, AgentClientToBackendMessage } from "./agent-types"
-import { PDFBackendToClientMessage, PDFClientToBackendMessage } from "./pdf-types"
+import { AgentBackendToClientMessage, AgentClientToBackendMessage } from "./agent-types.js"
+import { PDFBackendToClientMessage, PDFClientToBackendMessage } from "./pdf-types.js"
 
 export type BackendToClientMessage = PDFBackendToClientMessage | AgentBackendToClientMessage
 

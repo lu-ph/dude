@@ -7,8 +7,8 @@ import {
   jumpToPage,
   nextPage,
   previousPage,
-  showPdfViewer,
-} from "../window/pdf-viewer-window.js"
+} from "../../windows/pdf-viewer-controller.js"
+import { showPdfViewer } from "../../windows/pdf-viewer-window.js"
 
 export function createPdfViewerMcpServer(): any {
   return createSdkMcpServer({

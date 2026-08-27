@@ -1,4 +1,4 @@
-import type { AIConfig } from "../utils/env-utils.js"
+import type { AIConfig } from "../config/env.js"
 
 export interface AgentChatRequestMessage {
   type: "agent:chat_request"

@@ -1,8 +1,8 @@
 import { ipcMain, BrowserWindow } from "electron"
-import { sessions } from "./window/window-manager.js"
-import { AgentSession } from "./bridge/agent-session.js"
-import { PDFViewerSession } from "./bridge/pdf-viewer-session.js"
-import { showSettingsWindow } from "./window/settings-window.js"
+import { sessions } from "./session-registry.js"
+import { PDFViewerSession } from "../sessions/pdf-viewer-session.js"
+import { AgentSession } from "../sessions/agent-session.js"
+import { showSettingsWindow } from "../windows/settings-window.js"
 
 export function setupIpcRoutes(): void {
   ipcMain.on("common:renderer-to-main", (event, message) => {
@@ -12,25 +12,19 @@ export function setupIpcRoutes(): void {
   ipcMain.on("agent:renderer-to-main", (event, message) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
-    const winSessions = sessions.get(win.id)
-    if (!winSessions) return
-    const agentSession = winSessions.find((s) => s instanceof AgentSession) as
-      AgentSession | undefined
-    if (agentSession) {
-      agentSession.handleMessage(message)
-    }
+    const agentSession = sessions
+      .get(win.id)
+      ?.find((s): s is AgentSession => s instanceof AgentSession)
+    agentSession?.handleMessage(message)
   })
 
   ipcMain.on("pdf:renderer-to-main", (event, message) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
-    const winSessions = sessions.get(win.id)
-    if (!winSessions) return
-    const pdfSession = winSessions.find((s) => s instanceof PDFViewerSession) as
-      PDFViewerSession | undefined
-    if (pdfSession) {
-      pdfSession.handleMessage(message)
-    }
+    const pdfSession = sessions
+      .get(win.id)
+      ?.find((s): s is PDFViewerSession => s instanceof PDFViewerSession)
+    pdfSession?.handleMessage(message)
   })
 
   ipcMain.on("ping", () => console.log("pong"))

@@ -15,7 +15,7 @@ export function AgentSidebar({ isExpanded, onToggle }: AgentSidebarProps): React
       <div className="flex-1 overflow-y-auto overflow-x-hidden"></div>
 
       <div
-        className={`flex p-[8px] border-t border-[#3c3c3c] ${
+        className={`flex p-[8px] ${
           isExpanded ? "flex-row items-center justify-between" : "flex-col items-center gap-[8px]"
         }`}
       >

@@ -1,10 +1,10 @@
 import { query, type Query } from "@anthropic-ai/claude-agent-sdk"
 import dotenv from "dotenv"
-import { createScreenshotMcpServer } from "../tools/screen-capture.js"
-import { createPdfViewerMcpServer } from "../tools/pdf-viewer-tool.js"
+import { createScreenshotMcpServer } from "./mcp/screenshot.js"
+import { createPdfViewerMcpServer } from "./mcp/pdf-viewer.js"
 import fs from "node:original-fs"
 import path from "node:path"
-import { AIConfig, loadLLMEnv } from "../utils/env-utils.js"
+import { AIConfig, loadLLMEnv } from "../config/env.js"
 
 dotenv.config()
 
@@ -98,9 +98,7 @@ export class Agent {
             args: ["@playwright/mcp@latest"],
           },
           screenshot: createScreenshotMcpServer(),
-          // notePanel: createNotePanelMcpServer(),
           pdfViewer: createPdfViewerMcpServer(),
-          // presentationWindow: createPresentationWindowMcpServer(),
         },
         permissionMode: "bypassPermissions",
         allowedTools: [
@@ -111,9 +109,7 @@ export class Agent {
           "Glob",
           "mcp__playwright__*",
           "mcp__screenshot__*",
-          // "mcp__note-panel__*",
           "mcp__pdf-viewer__*",
-          // "mcp__presentation-window__*",
         ],
       },
     })

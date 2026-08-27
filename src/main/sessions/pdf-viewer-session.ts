@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises"
-import { BaseSession } from "../types/interface/session"
-import { PDFClientToBackendMessage } from "../types/pdf-types"
+import { BaseSession } from "../types/session.js"
+import { PDFClientToBackendMessage } from "../types/pdf-types.js"
 
 interface IpcClient {
   send(message: unknown): void
@@ -100,7 +100,7 @@ export class PDFViewerSession implements BaseSession {
     })
   }
 
-  public destroy(): undefined {
-    return undefined
+  public destroy(): void {
+    this.pageReadyWaiters.clear()
   }
 }

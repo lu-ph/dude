@@ -46,7 +46,7 @@ export function AgentSettingsPanel(): React.JSX.Element {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#252526] p-6 text-[#cccccc] font-sans">
+    <div className="flex min-h-screen flex-col bg-[#1e1e1e] p-6 text-[#cccccc] font-sans">
       <div className="mx-auto flex w-full max-w-[480px] flex-1 flex-col">
         <div className="flex items-center justify-between pb-5">
           <h2 className="text-[#e1e1e1] text-[15px] font-semibold tracking-wide">设置</h2>
@@ -88,7 +88,7 @@ export function AgentSettingsPanel(): React.JSX.Element {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="sk-..."
-                className="w-full bg-[#1e1e1e] border border-[#3c3c3c] text-[#cccccc] text-[16px] px-[12px] py-[8px] pr-[36px] rounded-[6px] outline-none focus:border-[#007acc] focus:ring-1 focus:ring-[#007acc]/50 transition-all placeholder:text-[#555555]"
+                className="w-full bg-[#252526] border border-[#3c3c3c] text-[#cccccc] text-[16px] px-[12px] py-[8px] pr-[36px] rounded-[6px] outline-none focus:border-[#007acc] focus:ring-1 focus:ring-[#007acc]/50 transition-all placeholder:text-[#555555]"
               />
               <button
                 type="button"
@@ -141,7 +141,7 @@ export function AgentSettingsPanel(): React.JSX.Element {
               value={modelName}
               onChange={(e) => setModelName(e.target.value)}
               placeholder="model name used by api"
-              className="bg-[#1e1e1e] border border-[#3c3c3c] text-[#cccccc] text-[16px] px-[12px] py-[8px] rounded-[6px] outline-none focus:border-[#007acc] focus:ring-1 focus:ring-[#007acc]/50 transition-all placeholder:text-[#555555]"
+              className="bg-[#252526] border border-[#3c3c3c] text-[#cccccc] text-[16px] px-[12px] py-[8px] rounded-[6px] outline-none focus:border-[#007acc] focus:ring-1 focus:ring-[#007acc]/50 transition-all placeholder:text-[#555555]"
             />
           </div>
 
@@ -159,7 +159,7 @@ export function AgentSettingsPanel(): React.JSX.Element {
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="e.g. https://openrouter.ai/api"
-              className="bg-[#1e1e1e] border border-[#3c3c3c] text-[#cccccc] text-[16px] px-[12px] py-[8px] rounded-[6px] outline-none focus:border-[#007acc] focus:ring-1 focus:ring-[#007acc]/50 transition-all placeholder:text-[#555555]"
+              className="bg-[#252526] border border-[#3c3c3c] text-[#cccccc] text-[16px] px-[12px] py-[8px] rounded-[6px] outline-none focus:border-[#007acc] focus:ring-1 focus:ring-[#007acc]/50 transition-all placeholder:text-[#555555]"
             />
           </div>
         </div>

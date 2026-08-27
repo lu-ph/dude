@@ -1,18 +1,10 @@
 import { BrowserWindow } from "electron"
 import { join } from "path"
-import { is } from "@electron-toolkit/utils"
 import icon from "../../../resources/icon.png?asset"
-import { setupWindowSession } from "./window-manager.js"
+import { setupWindowSession } from "../ipc/session-registry.js"
+import { loadRoute } from "./load-route.js"
 
 let settingsWindow: BrowserWindow | null = null
-
-function loadSettingsRoute(window: BrowserWindow): void {
-  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    window.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}#/settings`)
-  } else {
-    window.loadFile(join(__dirname, "../renderer/index.html"), { hash: "/settings" })
-  }
-}
 
 export function showSettingsWindow(parentWindow?: BrowserWindow): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -22,6 +14,7 @@ export function showSettingsWindow(parentWindow?: BrowserWindow): void {
   }
 
   settingsWindow = new BrowserWindow({
+    title: "设置",
     width: 520,
     height: 500,
     resizable: false,
@@ -41,6 +34,6 @@ export function showSettingsWindow(parentWindow?: BrowserWindow): void {
     settingsWindow = null
   })
 
-  loadSettingsRoute(settingsWindow)
+  loadRoute(settingsWindow, "/settings")
   setupWindowSession(settingsWindow, { createAgent: false })
 }

@@ -1,7 +1,12 @@
-import { Agent } from "../service/agent.js"
-import { BaseSession } from "../types/interface/session.js"
-import { BackendToClientMessage, ClientToBackendMessage, isMessageType } from "../types/types.js"
-import { checkEnv, loadEnvFromJson, setLLMEnvJson } from "../utils/env-utils.js"
+
+import { BaseSession } from "../types/session.js"
+import {
+  BackendToClientMessage,
+  ClientToBackendMessage,
+  isMessageType,
+} from "../types/ipc-types.js"
+import { checkEnv, loadEnvFromJson, setLLMEnvJson } from "../config/env.js"
+import { Agent } from "../agent/agent.js"
 
 interface IpcClient {
   send(message: BackendToClientMessage): void
@@ -12,7 +17,6 @@ export class AgentSession implements BaseSession {
   private agent: Agent | null = null
   private isListening: boolean = false
   private isDestroyed: boolean = false
-  // private pendingContent: string = ""
 
   constructor(client: IpcClient, createAgent = true) {
     this.client = client
@@ -97,7 +101,6 @@ export class AgentSession implements BaseSession {
   private async listenToAgent(): Promise<void> {
     if (this.isListening) return
     this.isListening = true
-    // this.pendingContent = ""
 
     try {
       for await (const message of this.agent?.getOutputStream() ?? []) {

@@ -1,7 +1,7 @@
 import { BrowserWindow } from "electron"
-import { AgentSession } from "../bridge/agent-session.js"
-import { PDFViewerSession } from "../bridge/pdf-viewer-session.js"
-import type { BaseSession } from "../types/interface/session.js"
+import { PDFViewerSession } from "../sessions/pdf-viewer-session.js"
+import type { BaseSession } from "../types/session.js"
+import { AgentSession } from "../sessions/agent-session.js"
 
 export const sessions = new Map<number, BaseSession[]>()
 
@@ -37,4 +37,13 @@ export function setupWindowSession(
       sessions.delete(window.id)
     }
   })
+}
+
+export function getSession<T extends BaseSession>(
+  window: BrowserWindow,
+  SessionClass: new (...args: never[]) => T,
+): T | undefined {
+  const winSessions = sessions.get(window.id)
+  if (!winSessions) return undefined
+  return winSessions.find((s): s is T => s instanceof SessionClass)
 }

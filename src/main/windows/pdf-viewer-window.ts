@@ -1,29 +1,25 @@
-import { BrowserWindow } from "electron"
+import { BrowserWindow, screen } from "electron"
 import { join } from "path"
-import { is } from "@electron-toolkit/utils"
 import icon from "../../../resources/icon.png?asset"
-import { setupWindowSession, sessions } from "../window/window-manager.js"
-import { PDFViewerSession } from "../bridge/pdf-viewer-session.js"
+import { getSession, setupWindowSession } from "../ipc/session-registry.js"
+import { PDFViewerSession } from "../sessions/pdf-viewer-session.js"
+import { loadRoute } from "./load-route.js"
+import { getMainWindow } from "./main-window.js"
 
 let pdfViewerWindow: BrowserWindow | null = null
-let pdfSession: PDFViewerSession
+let hasArrangedWindows = false
 
-function loadRoute(window: BrowserWindow, hashRoute: string = "/"): void {
-  const formattedHash = hashRoute.startsWith("/") ? `#${hashRoute}` : `#/${hashRoute}`
-
-  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    window.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}${formattedHash}`)
-  } else {
-    window.loadFile(join(__dirname, "../renderer/index.html"), {
-      hash: hashRoute,
-    })
+export function getPdfViewerWindow(): BrowserWindow | null {
+  if (pdfViewerWindow && !pdfViewerWindow.isDestroyed()) {
+    return pdfViewerWindow
   }
+  return null
 }
 
-function getPdfSession(window: BrowserWindow): PDFViewerSession | undefined {
-  const winSessions = sessions.get(window.id)
-  if (!winSessions) return undefined
-  return winSessions.find((s): s is PDFViewerSession => s instanceof PDFViewerSession)
+export function getPdfViewerSession(): PDFViewerSession | undefined {
+  const window = getPdfViewerWindow()
+  if (!window) return undefined
+  return getSession(window, PDFViewerSession)
 }
 
 export function showPdfViewer(filePath: string): Promise<void> {
@@ -35,7 +31,8 @@ export function showPdfViewer(filePath: string): Promise<void> {
       pdfViewerWindow.restore()
     }
     pdfViewerWindow.focus()
-    pdfSession = getPdfSession(pdfViewerWindow)
+
+    const pdfSession = getPdfViewerSession()
     if (!pdfSession) {
       return Promise.reject(new Error("PDFViewerSession not found"))
     }
@@ -43,9 +40,10 @@ export function showPdfViewer(filePath: string): Promise<void> {
   }
 
   pdfViewerWindow = new BrowserWindow({
+    title: "PDF Viewer",
     width: 1000,
     height: 1400,
-    show: true,
+    show: false,
     autoHideMenuBar: true,
     ...(process.platform === "linux" ? { icon } : {}),
     webPreferences: {
@@ -54,8 +52,19 @@ export function showPdfViewer(filePath: string): Promise<void> {
     },
   })
 
+  pdfViewerWindow.on("closed", () => {
+    pdfViewerWindow = null
+  })
+
+  if (!hasArrangedWindows) {
+    arrangeWindows(pdfViewerWindow)
+    hasArrangedWindows = true
+  }
+
   loadRoute(pdfViewerWindow, "/pdfviewer")
   setupWindowSession(pdfViewerWindow)
+
+  pdfViewerWindow.once("ready-to-show", () => pdfViewerWindow?.show())
 
   return new Promise<void>((resolve, reject) => {
     const consoleErrors: string[] = []
@@ -74,7 +83,7 @@ export function showPdfViewer(filePath: string): Promise<void> {
     }
 
     const onLoad = (): void => {
-      pdfSession = getPdfSession(pdfViewerWindow!)
+      const pdfSession = getPdfViewerSession()
       if (!pdfSession) {
         cleanup()
         reject(new Error("PDFViewerSession not found"))
@@ -107,46 +116,42 @@ export function showPdfViewer(filePath: string): Promise<void> {
   })
 }
 
-export async function captureScreenshot(): Promise<string> {
-  checkWindowAvailable()
+function arrangeWindows(pdfWindow: BrowserWindow): void {
+  const agentWindow = getMainWindow()
+  if (!agentWindow || agentWindow.isDestroyed()) return
 
-  await pdfSession.waitForPageReady(1)
+  const agentBounds = agentWindow.getBounds()
+  const display = screen.getDisplayMatching(agentBounds)
 
-  const image = await pdfViewerWindow!.webContents.capturePage()
-  return image.toPNG().toString("base64")
-}
+  const { x, y, width, height } = display.workArea
 
-export async function jumpToPage(pageNum: number): Promise<string> {
-  checkWindowAvailable()
+  // Windows 10/11 invisible shadow border offset. unit: pixels
+  const winBorderMargin = process.platform === "win32" ? 7 : 0
+  const winTopGap = process.platform === "win32" ? 2 : 0
 
-  const pageReady = pdfSession.waitForPageReady(pageNum)
-  pdfSession.jumpToPage(pageNum)
-  await pageReady
+  const leftWidth = Math.floor(width / 2)
+  const rightWidth = width - leftWidth
 
-  const image = await pdfViewerWindow.webContents.capturePage()
-  return image.toPNG().toString("base64")
-}
-
-export async function nextPage(): Promise<string> {
-  checkWindowAvailable()
-  const pageReady = pdfSession.waitForPageReady()
-  pdfSession.nextPage()
-  await pageReady
-  const image = await pdfViewerWindow!.webContents.capturePage()
-  return image.toPNG().toString("base64")
-}
-
-export async function previousPage(): Promise<string> {
-  checkWindowAvailable()
-  const pageReady = pdfSession.waitForPageReady()
-  pdfSession.previousPage()
-  await pageReady
-  const image = await pdfViewerWindow!.webContents.capturePage()
-  return image.toPNG().toString("base64")
-}
-
-function checkWindowAvailable(): void {
-  if (!pdfViewerWindow || pdfViewerWindow.isDestroyed()) {
-    throw new Error("PDF Viewer window is not available")
+  for (const win of [pdfWindow, agentWindow]) {
+    if (win.isMaximized()) win.unmaximize()
   }
+
+  // For the left window, expand to the left and down, 
+  // and extend further to the right by the margin amount 
+  // to offset the gap.
+  pdfWindow.setBounds({
+    x: x - winBorderMargin,
+    y: y,
+    width: leftWidth + winBorderMargin * 2,
+    height: height + winBorderMargin + winTopGap
+  })
+
+  // For the right window, shift left to cover the gap; 
+  // expand right and down.
+  agentWindow.setBounds({
+    x: x + leftWidth - winBorderMargin,
+    y: y,
+    width: rightWidth + winBorderMargin * 2,
+    height: height + winBorderMargin + winTopGap
+  })
 }
