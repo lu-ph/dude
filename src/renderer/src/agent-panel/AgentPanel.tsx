@@ -253,8 +253,8 @@ export function AgentPanel(): React.JSX.Element {
               </div>
             ))}
             {!isWaitingPrompt && (
-              <div className="flex items-center self-start px-[4px] py-[4px]">
-                <div className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-[#4d4d4d] border-t-[#3794ff]" />
+              <div className="flex animate-pulse items-center self-start px-[4px] py-[4px] text-[14px] text-[#d4d4d4]">
+                正在思考
               </div>
             )}
             <div ref={messagesEndRef} className="h-[10px]" />
@@ -294,12 +294,9 @@ export function AgentPanel(): React.JSX.Element {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={
-                  isWaitingPrompt ? "(Enter 发送, Shift+Enter 换行)..." : "Agent 正在处理中..."
-                }
+                placeholder="(Enter 发送, Shift+Enter 换行)..."
                 rows={2}
                 className="w-full max-h-[150px] min-h-[56px] bg-transparent text-[#cccccc] text-[15px] px-[14px] py-[12px] resize-none outline-none overflow-y-auto [::-webkit-scrollbar]:w-[6px] [::-webkit-scrollbar-thumb]:bg-[#424242] [::-webkit-scrollbar-thumb]:rounded-[3px]"
-                disabled={!isWaitingPrompt}
               />
 
               {isWaitingPrompt ? (

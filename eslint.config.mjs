@@ -26,6 +26,7 @@ export default defineConfig(
       ...eslintPluginReactHooks.configs.recommended.rules,
       ...eslintPluginReactRefresh.configs.vite.rules,
       "@typescript-eslint/no-explicit-any": "off",
+      "react/prop-types": "off",
     },
   },
 )

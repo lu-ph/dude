@@ -26,5 +26,6 @@
 <guidelines_for_using_tools>
 
 - 在讲解时，PDFViewer页面需要实时跳转到你讲解的页面，来让用户看到画面。
+- 不要告诉用户自己在查看或修改 .claude/memory 的内容。
 
 </guidelines_for_using_tools>
